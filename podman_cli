@@ -1,0 +1,157 @@
+yum module install container-tools -y
+podman info
+podman version
+podman images
+podman pull quay.io/kushalsamota/centos
+podman images
+podman pull docker.io/mysql
+podman images
+podman pull docker.io/mysql:5.6
+podman images
+#note ---- if docker pull limit error you face move to next command.
+podman pull quay.io/kushalsamota/httpd
+podman inspect quay.io/kushalsamota/httpd ============ see the cmd and all other things
+podman inspect quay.io/kushalsamota/centos ============ see the cmd and all other things
+
+#task -- create a account on docker.io and verify it with email sent to registered email address.
+podman login docker.io
+#give docker.io username and password and you will see a login succeeded message.
+podman images
+podman tag <image id of centos>  docker.io/<yourdockerusername>/javagpg:v1
+podman push docker.io/<yourdockerusername>/javagpg:v1
+#go to docker.io and confirm whether the image has been uploaded or not.
+
+podman rmi <imageid of centos image>
+podman images
+podman system df
+podman pull quay.io/kushalsamota/httpd
+podman images
+podman save <imageid of httpd image> -o httpd.tar
+podman rmi quay.io/kushalsamota/httpd
+podman images ==== you wont see the image
+ls  === you will see a tar file
+podman load -i httpd.tar
+podman images === you will see a image with no name that is a dangling image
+podman tag <imageid of that image> httpd:latest
+podman images
+
+podman rmi $(podman images -a -q)
+podman images ==== if you still see some images than remove them with their name by using podman rmi <name of image>
+ls /var/lib/containers/storage/overlay  === this wil give you all the images in layer format. layer is a directory.
+done..!
+
+
+##################################################################
+container exercise
+##################################################################
+
+podman run -itd --name centoscontainer quay.io/kushalsamota/centos
+podman ps
+podman ps -a
+podman rm centoscontainer
+podman stop centoscontainer
+podman rm centoscontainer
+podman ps
+podman run -itd --name centoscontainer quay.io/kushalsamota/centos
+podman ps
+podman run -d --name apachecontainer quay.io/kushalsamota/httpd
+podman exec -it apachecontainer bash ==== to go in container
+exit
+podman ps
+podman exec -it centoscontainer hostname
+podman exec -it centoscontainer cat /etc/redhat-release
+podman exec -it centoscontainer cat /etc/passwd
+podman rm -f centoscontainer apachecontainer
+podman run -d --name mysqlcontainer -e MYSQL_ROOT_PASSWORD=redhat mysql:5.6
+podman ps
+podman exec -it mysqlcontainer bash
+mysql -u root -p ==== give redhat as password on prompt
+show databases;
+exit
+exit
+podman ps
+podman rm -f mysqlcontainer
+
+podman run -d --name tomcatcontainer docker.io/tomcat:9.0
+podman inspect tomcatcontainer ==== see all info about container
+podman rm -f tomcatcontainer
+podman rm -f $(podman ps -a -q)  == this will remove all the container forcefully
+podman system df
+podman ps
+podman run --help | grep cpu   === you can limit cpu
+podman run --help | grep memory === you can limit memory
+
+# copy the file inside container and from container
+podman run -itd --name centoscontainer centos
+touch /index.html
+podman cp /index.html centoscontainer:/
+podman exec -it centoscontainer ls /
+podman cp centoscontainer:/etc/passwd  /
+ls /
+podman rm -f centoscontainer
+podman run -d --name apachecontainer httpd
+podman logs apachecontainer
+podman rm -f apachecontainer
+done...!
+
+===============================================
+Network Exercise
+podman ps
+podman run -d --name apache -p 80:80 quay.io/kushalsamota/httpd
+podman ps
+curl localhost:80
+
+podman network ls
+podman network inspect podman  === and see the range from which container are having the ip addresses
+podman run -itd --name centos1 quay.io/kushalsamota/centos
+podman run -itd --name centos2 quay.io/kushalsamota/centos
+podman inspect centos1 | grep -i ip
+podman inspect centos2 | grep -i ip
+podman exec -it centos1 bash
+ping <ip of centos2>
+exit
+podman rm -f centos1 centos2
+podman rm -f apache
+
+podman run -d --name nginx -p 82:80 quay.io/kushalsamota/nginx
+netstat -tulpn | grep -i listen ===== and see which process is listening on 82 port number. you will also see the pid of process listening on 82. like 19742/82
+ps -ef | grep pidofprocess
+curl localhost:82
+podman rm -f nginx
+
+podman run -d -p 80:80 --name apache1 quay.io/kushalsamota/httpd
+podman run -d -p 82:80 --name apache2 quay.io/kushalsamota/httpd
+podman port --all === to see all port mappings.
+podman rm -f apache1 apache2
+
+# volume exercise #
+podman rm -f $(podman ps -a -q)
+podman rmi $(podman images -a -q)
+if some images is there remove them
+mkdir /websitedata
+echo "<h1> It Works </h1>" > /websitedata/index.html
+cat /websitedata/index.html
+podman run -d --name apachecontainer -v /websitedata:/usr/local/apache2/htdocs:Z -p 80:80 quay.io/kushalsamota/httpd
+curl localhost
+podman exec -it apachecontainer bash
+echo hello >> /usr/local/apache2/htdocs/index.html
+#it will change because we have mounted in rw mode.#
+exit
+cat /websitedata/index.html  === see the change
+podman rm -f apachecontainer
+podman run -d --name apachecontainer -v /websitedata:/usr/local/apache2/htdocs:Z,ro -p 80:80 quay.io/kushalsamota/httpd
+podman exec -it apachecontainer bash
+echo hello >> /usr/local/apache2/htdocs/index.html
+#it will give error as we have mounted volume in ro mode.
+exit
+podman rm -f apachecontainer
+podman rmi quay.io/kushalsamota/httpd
+
+#another way to create volume is#
+podman volume create mysqldata
+podman volume ls
+podman volume inspect mysqldata
+ls /var/lib/containers/storage/ === there will be a volumes folder go in that and verify mysqldata folder
+podman run -d --name mysql -e MYSQL_ROOT_PASSWORD=redhat -v mysqldata:/var/lib/mysql quay.io/kushalsamota/mysql
+podman ps
+podman rm -f mysql
